@@ -10,6 +10,13 @@ engine = db.create_engine("sqlite+pysqlite:///albums.sqlite", echo=False)
 class Base(orm.DeclarativeBase):
     pass
 
+album_genre = db.Table(
+    "album_genre",
+    Base.metadata,
+    db.Column("album_id", db.Integer, db.ForeignKey("album.id"), primary_key=True),
+    db.Column("genre_id", db.Integer, db.ForeignKey("genre.id"), primary_key=True)
+)
+
 
 # A slight tweak here - we declare column names and used mapped columns
 # There is more to come here
@@ -36,6 +43,16 @@ class Album(Base):
     # ...and albums get an "artist" field
 
     artist = orm.relationship('Artist', back_populates='albums')
+    genres = orm.relationship('Genre', secondary='album_genre', back_populates="albums")
+
+class Genre(Base):
+    __tablename__ = "genre"
+
+    id = orm.mapped_column(db.Integer, primary_key=True)
+    label = orm.mapped_column(db.String)
+
+    albums = orm.relationship('Album', secondary='album_genre', back_populates="genres")
+
 
 
 # Now the metadata is created for our Base class
@@ -44,27 +61,42 @@ Base.metadata.create_all(engine)
 
 # We now use a Session rather than a connection
 
-with orm.Session(engine) as session:
+with (orm.Session(engine) as session):
     # Now the magic happens
     # https://stackoverflow.com/questions/17325006/how-to-create-a-foreignkey-reference-with-sqlalchemy
 
+    # Let's have some genres
+
+    genre1 = Genre(label="Pop")
+
+    session.add(genre1)
+
+    genre2 = Genre(label="Electronic")
+
+    session.add(genre2)
+
+    # And some artists
+
     artist1 = Artist(name="Depeche Mode")
-
-    session.add(artist1)
-
-    new_album = Album(title="A Broken Frame", artist=artist1)
-
-    session.add(new_album)
-
-    # Or as a batch
-
     artist2 = Artist(name="Orbital")
     artist3 = Artist(name="New Order")
+
+    session.add_all([artist1, artist2, artist3])
+
+    # And an album with artist and genre
+
+    album1 = Album(title="A Broken Frame", artist=artist1)
+    album1.genres.append(genre1)
+    album1.genres.append(genre2)
+
+    session.add(album1)
+
+    # Or as a batch
 
     session.add_all(
         [
             Album(title="Violator", artist=artist1),
-            Album(title="Orbital", artist=artist2),
+            Album(title="Orbital", artist=artist2, genres=[genre2]),
             Album(title="Technique", artist=artist3)
         ]
     )
@@ -78,11 +110,33 @@ with orm.Session(engine) as session:
     album_query = session.query(Album)
 
     for album in album_query:
-        print(f'{album.title} by {album.artist.name}')
+        print(f'{album.title} by {album.artist.name}, {[g.label for g in album.genres]}')
 
     # Now let's filter
 
-    artist_query = session.query(Album).join(Artist).where(Artist.name == "Depeche Mode")
+    print('\nJust albums by Depeche Mode\n')
+
+    artist_query = session.query(Album) .join(Artist).where(Artist.name == "Depeche Mode")
 
     for album in artist_query:
-        print(f'{album.title} by {album.artist.name}')
+        print(f'{album.title} by {album.artist.name}, {[g.label for g in album.genres]}')
+
+    # Now let's filter on one of our artists
+
+    print(f'\nJust albums by {artist2}\n')
+
+    artist_query = session.query(Album).where(Album.artist == artist2)
+
+    for album in artist_query:
+        print(f'{album.title} by {album.artist.name}, {[g.label for g in album.genres]}')
+
+    # And filtering via a link table!
+
+    print('\nNow just "Electronic" music')
+
+    genre_query = session.query(Album).join(album_genre).join(Genre).where(Genre.label == "Electronic")
+
+    for album in genre_query:
+        print(f'{album.title} by {album.artist.name}, {[g.label for g in album.genres]}')
+
+
