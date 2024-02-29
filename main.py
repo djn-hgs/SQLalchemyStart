@@ -1,7 +1,8 @@
 import sqlalchemy as db
 import sqlalchemy.orm as orm
 
-engine = db.create_engine("sqlite+pysqlite:///albums.sqlite", echo=True)
+engine = db.create_engine("sqlite+pysqlite:///albums.sqlite", echo=False)
+
 
 # We no longer need a metadata object
 # Now we just create an abstract Base class which has its own metadata
@@ -9,15 +10,33 @@ engine = db.create_engine("sqlite+pysqlite:///albums.sqlite", echo=True)
 class Base(orm.DeclarativeBase):
     pass
 
+
 # A slight tweak here - we declare column names and used mapped columns
 # There is more to come here
+
+class Artist(Base):
+    __tablename__ = "artist"
+
+    id = orm.mapped_column(db.Integer, primary_key=True)
+    name = orm.mapped_column(db.String)
+
+    # Now we have a foreign key we can do something seriously clever
+    # This means that artists get an "albums" field
+
+    albums = orm.relationship('Album', back_populates='artist')
+
 
 class Album(Base):
     __tablename__ = "album"
 
     id = orm.mapped_column(db.Integer, primary_key=True)
-    name = orm.mapped_column(db.String)
-    artist = orm.mapped_column(db.String)
+    title = orm.mapped_column(db.String)
+    artist_id = orm.mapped_column(db.Integer, db.ForeignKey("artist.id"))
+
+    # ...and albums get an "artist" field
+
+    artist = orm.relationship('Artist', back_populates='albums')
+
 
 # Now the metadata is created for our Base class
 
@@ -26,24 +45,27 @@ Base.metadata.create_all(engine)
 # We now use a Session rather than a connection
 
 with orm.Session(engine) as session:
-    # So to add to our table we can now just create an instance and add it
+    # Now the magic happens
+    # https://stackoverflow.com/questions/17325006/how-to-create-a-foreignkey-reference-with-sqlalchemy
 
-    new_album = Album(name="A Broken Frame", artist="Depeche Mode")
+    artist1 = Artist(name="Depeche Mode")
+
+    session.add(artist1)
+
+    new_album = Album(title="A Broken Frame", artist=artist1)
 
     session.add(new_album)
 
-    # And now we can query it "session.scalars" is always a bit odd, i think
+    # Or as a batch
 
-    for album in session.scalars(db.select(Album)):
-        print(f'{album.name} by {album.artist}')
-
-    # And to add many items
+    artist2 = Artist(name="Orbital")
+    artist3 = Artist(name="New Order")
 
     session.add_all(
         [
-            Album(name="Violator", artist="Depeche Mode"),
-            Album(name="Orbital", artist="Orbital"),
-            Album(name="Technique", artist="New Order")
+            Album(title="Violator", artist=artist1),
+            Album(title="Orbital", artist=artist2),
+            Album(title="Technique", artist=artist3)
         ]
     )
 
@@ -51,8 +73,16 @@ with orm.Session(engine) as session:
 
     session.commit()
 
-    artist_query = db.select(Album).where(Album.artist=="Depeche Mode")
+    # Let's get everything (echo gets irritating here, so I turned it off)
 
-    for album in session.scalars(artist_query):
-        print(f'{album.name} by {album.artist}')
+    album_query = session.query(Album)
 
+    for album in album_query:
+        print(f'{album.title} by {album.artist.name}')
+
+    # Now let's filter
+
+    artist_query = session.query(Album).join(Artist).where(Artist.name == "Depeche Mode")
+
+    for album in artist_query:
+        print(f'{album.title} by {album.artist.name}')
