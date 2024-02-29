@@ -19,6 +19,21 @@ album = db.Table(
     db.Column("artist_id", db.String, db.ForeignKey("artist.artist_id"))
 )
 
+genre = db.Table(
+    "genre",
+    metadata_obj,
+    db.Column("id", db.Integer, primary_key=True),
+    db.Column("genre_name", db.String)
+)
+
+album_genre = db.Table(
+    "album_genre",
+    metadata_obj,
+    db.Column("id", db.Integer, primary_key=True),
+    db.Column("album_id", db.ForeignKey("album.id")),
+    db.Column("genre_id", db.ForeignKey("genre.id"))
+)
+
 metadata_obj.create_all(engine)
 
 with engine.connect() as conn:
@@ -27,46 +42,98 @@ with engine.connect() as conn:
     #         artist="Depeche Mode"
     #     )
 
-    item1_result = conn.execute(
+    # Let's add a few artists
+
+    artist1_result = conn.execute(
         db.insert(artist).values(artist_name="Depeche Mode")
     )
 
-    item1_id, = item1_result.inserted_primary_key
+    artist1_id, = artist1_result.inserted_primary_key
 
-    item2_result = conn.execute(
+    artist2_result = conn.execute(
         db.insert(artist).values(artist_name="Orbital")
     )
 
-    item2_id, = item2_result.inserted_primary_key
+    artist2_id, = artist2_result.inserted_primary_key
 
-    item3_result = conn.execute(
+    artist3_result = conn.execute(
         db.insert(artist).values(artist_name="New Order")
     )
 
-    item3_id, = item3_result.inserted_primary_key
+    artist3_id, = artist3_result.inserted_primary_key
 
-    first_album = conn.execute(
+    # Now some albums
+
+    album1_result = conn.execute(
         album.insert().values(
             album_name="Speak and Spell",
-            artist_id=item1_id
+            artist_id=artist1_id
         )
     )
+
+    album1_id, = album1_result.inserted_primary_key
 
     insert_albums = conn.execute(
         db.insert(album),
         [
-            {"album_name": "Violator", "artist_id": item1_id},
-            {"album_name": "Orbital", "artist_id": item2_id},
-            {"album_name": "Technique", "artist_id": item3_id}
+            {"album_name": "Violator", "artist_id": artist1_id},
+            {"album_name": "Orbital", "artist_id": artist2_id},
+            {"album_name": "Technique", "artist_id": artist3_id}
         ]
     )
 
-    query_result = conn.execute(
-        db.select(album.c.album_name, artist.c.artist_name).select_from(db.join(artist, album))
+    # And some genres
+
+    genre1_result = conn.execute(
+        genre.insert().values(
+            genre_name="Electronic"
+        )
     )
 
-    for row in query_result:
+    genre1_id, = genre1_result.inserted_primary_key
+
+    genre2_result = conn.execute(
+        genre.insert().values(
+            genre_name="Pop"
+        )
+    )
+
+    genre2_id, = genre2_result.inserted_primary_key
+
+    # Now associate an album with a genre
+
+    album_genre_result = conn.execute(
+        album_genre.insert(),
+        [
+            {"album_id": album1_id, "genre_id": genre1_id},
+            {"album_id": album1_id, "genre_id": genre2_id}
+        ]
+    )
+
+    # And a query
+
+    artist_album_result = conn.execute(
+        db.select(album.c.album_name, artist.c.artist_name)
+        .select_from(
+            artist
+            .join(album)
+        )
+    )
+
+    for row in artist_album_result:
+        print(row)
+
+    artist_album_genre_result = conn.execute(
+        db.select(album.c.album_name, artist.c.artist_name, genre.c.genre_name)
+        .select_from(
+            artist
+            .join(album)
+            .join(album_genre)
+            .join(genre)
+        )
+    )
+
+    for row in artist_album_genre_result:
         print(row)
 
     conn.commit()
-
