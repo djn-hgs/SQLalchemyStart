@@ -1,6 +1,6 @@
 import sqlalchemy as db
 
-engine = db.create_engine("sqlite+pysqlite:///albums.sqlite", echo=True)
+engine = db.create_engine("sqlite:///albums.sqlite", echo=True)
 
 metadata_obj = db.MetaData()
 
