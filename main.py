@@ -1,15 +1,15 @@
-import sqlalchemy as sqla
+import sqlalchemy as db
 
-engine = sqla.create_engine("sqlite+pysqlite:///albums.sqlite", echo=True)
+engine = db.create_engine("sqlite+pysqlite:///albums.sqlite", echo=True)
 
-metadata_obj = sqla.MetaData()
+metadata_obj = db.MetaData()
 
-album = sqla.Table(
+album = db.Table(
     "album",
     metadata_obj,
-    sqla.Column("id", sqla.Integer, primary_key=True),
-    sqla.Column("name", sqla.String),
-    sqla.Column("artist", sqla.String)
+    db.Column("id", db.Integer, primary_key=True),
+    db.Column("name", db.String),
+    db.Column("artist", db.String)
 )
 
 metadata_obj.create_all(engine)
@@ -21,7 +21,7 @@ with engine.connect() as conn:
     #     )
 
     insert_result = conn.execute(
-        sqla.insert(album),
+        db.insert(album),
         [
             {
                 "name": "Violator",
@@ -33,7 +33,7 @@ with engine.connect() as conn:
     # print(insert_result.inserted_primary_key)
 
     insert_more = conn.execute(
-        sqla.insert(album),
+        db.insert(album),
         [
             {"name": "Orbital", "artist": "Orbital"},
             {"name": "Technique", "artist": "New Order"}
@@ -41,7 +41,7 @@ with engine.connect() as conn:
     )
 
     query_result = conn.execute(
-        sqla.select(album)
+        db.select(album)
     )
 
     for row in query_result:
