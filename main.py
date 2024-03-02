@@ -1,3 +1,5 @@
+import datetime
+
 import sqlalchemy as db
 import sqlalchemy.orm as orm
 
@@ -10,12 +12,18 @@ engine = db.create_engine("sqlite+pysqlite:///albums.sqlite", echo=False)
 class Base(orm.DeclarativeBase):
     pass
 
-album_genre = db.Table(
-    "album_genre",
-    Base.metadata,
-    db.Column("album_id", db.Integer, db.ForeignKey("album.id"), primary_key=True),
-    db.Column("genre_id", db.Integer, db.ForeignKey("genre.id"), primary_key=True)
-)
+# album_genre = db.Table(
+#     "album_genre",
+#     Base.metadata,
+#     db.Column("album_id", db.Integer, db.ForeignKey("album.id"), primary_key=True),
+#     db.Column("genre_id", db.Integer, db.ForeignKey("genre.id"), primary_key=True)
+# )
+
+class AlbumGenre(Base):
+    __tablename__ = "album_genre"
+
+    album_id: orm.Mapped[int] = orm.mapped_column(db.ForeignKey("album.id"), primary_key=True)
+    genre_id: orm.Mapped[int] = orm.mapped_column(db.ForeignKey("genre.id"), primary_key=True)
 
 
 # A slight tweak here - we declare column names and used mapped columns
@@ -24,8 +32,8 @@ album_genre = db.Table(
 class Artist(Base):
     __tablename__ = "artist"
 
-    id = orm.mapped_column(db.Integer, primary_key=True)
-    name = orm.mapped_column(db.String)
+    id: orm.Mapped[int] = orm.mapped_column(primary_key=True)
+    name: orm.Mapped[str]
 
     # Now we have a foreign key we can do something seriously clever
     # This means that artists get an "albums" field
@@ -36,9 +44,9 @@ class Artist(Base):
 class Album(Base):
     __tablename__ = "album"
 
-    id = orm.mapped_column(db.Integer, primary_key=True)
-    title = orm.mapped_column(db.String)
-    artist_id = orm.mapped_column(db.Integer, db.ForeignKey("artist.id"))
+    id: orm.Mapped[int] = orm.mapped_column(primary_key=True)
+    title: orm.Mapped[str]
+    artist_id: orm.Mapped[int] = orm.mapped_column(db.ForeignKey("artist.id"))
 
     # ...and albums get an "artist" field
 
@@ -48,11 +56,10 @@ class Album(Base):
 class Genre(Base):
     __tablename__ = "genre"
 
-    id = orm.mapped_column(db.Integer, primary_key=True)
-    label = orm.mapped_column(db.String)
+    id: orm.Mapped[int] = orm.mapped_column(primary_key=True)
+    label: orm.Mapped[str]
 
     albums = orm.relationship('Album', secondary='album_genre', back_populates="genres")
-
 
 
 # Now the metadata is created for our Base class
@@ -134,7 +141,7 @@ with (orm.Session(engine) as session):
 
     print('\nNow just "Electronic" music')
 
-    genre_query = session.query(Album).join(album_genre).join(Genre).where(Genre.label == "Electronic")
+    genre_query = session.query(Album).join(AlbumGenre).join(Genre).where(Genre.label == "Electronic")
 
     for album in genre_query:
         print(f'{album.title} by {album.artist.name}, {[g.label for g in album.genres]}')
